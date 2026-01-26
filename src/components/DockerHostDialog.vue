@@ -45,6 +45,7 @@
                                     <li><code>/var/run/docker.sock</code></li>
                                     <li><code>http://localhost:2375</code></li>
                                     <li><code>https://localhost:2376 (TLS)</code></li>
+                                    <li><code>ssh://user@example.com</code></li>
                                 </ul>
                             </i18n-t>
                         </div>
@@ -99,7 +100,7 @@ export default {
             modal: null,
             processing: false,
             id: null,
-            connectionTypes: ["socket", "tcp"],
+            connectionTypes: ["socket", "tcp", "ssh"],
             dockerHost: {
                 name: "",
                 dockerDaemon: "",
