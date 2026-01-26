@@ -23,7 +23,7 @@
 </template>
 
 <script>
-import { DOWN, UP, PENDING, MAINTENANCE } from "../util.ts";
+import { DOWN, UP, PENDING, MAINTENANCE, RESTARTING } from "../util.ts";
 
 export default {
     name: "Tooltip",
@@ -68,7 +68,11 @@ export default {
                 return this.$t("Unknown");
             }
 
-            switch (this.content.status) {
+            const status = Number(this.content.status);
+            if (!Number.isFinite(status)) {
+                return this.$t("Unknown");
+            }
+            switch (status) {
                 case DOWN:
                     return this.$t("Down");
                 case UP:
@@ -77,6 +81,8 @@ export default {
                     return this.$t("Pending");
                 case MAINTENANCE:
                     return this.$t("Maintenance");
+                case RESTARTING:
+                    return this.$t("Restarting");
                 default:
                     return this.$t("Unknown");
             }
@@ -87,7 +93,11 @@ export default {
                 return "status-empty";
             }
 
-            switch (this.content.status) {
+            const status = Number(this.content.status);
+            if (!Number.isFinite(status)) {
+                return "status-unknown";
+            }
+            switch (status) {
                 case DOWN:
                     return "status-down";
                 case UP:
@@ -96,6 +106,8 @@ export default {
                     return "status-pending";
                 case MAINTENANCE:
                     return "status-maintenance";
+                case RESTARTING:
+                    return "status-restarting";
                 default:
                     return "status-unknown";
             }
@@ -163,6 +175,10 @@ export default {
 
             &.status-maintenance {
                 color: $maintenance;
+            }
+
+            &.status-restarting {
+                color: $restarting;
             }
 
             &.status-empty {

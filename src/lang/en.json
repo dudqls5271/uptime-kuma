@@ -30,6 +30,7 @@
     "Up": "Up",
     "Down": "Down",
     "Pending": "Pending",
+    "Restarting": "Restarting",
     "statusMaintenance": "Maintenance",
     "Maintenance": "Maintenance",
     "Unknown": "Unknown",

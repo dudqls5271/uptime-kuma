@@ -7,6 +7,7 @@ const {
     DOWN,
     PENDING,
     MAINTENANCE,
+    RESTARTING,
     flipStatus,
     MAX_INTERVAL_SECOND,
     MIN_INTERVAL_SECOND,
@@ -71,6 +72,7 @@ const rootCertificates = rootCertificatesFingerprints();
  *      1 = UP
  *      2 = PENDING
  *      3 = MAINTENANCE
+ *      4 = RESTARTING
  */
 class Monitor extends BeanModel {
     /**
@@ -867,7 +869,7 @@ class Monitor extends BeanModel {
                         throw Error("Container is in a paused state");
                     }
                     if (res.data.State.Restarting) {
-                        bean.status = PENDING;
+                        bean.status = RESTARTING;
                         bean.msg = "Container is reporting it is currently restarting";
                     } else if (res.data.State.Health && res.data.State.Health.Status !== "none") {
                         // if healthchecks are disabled (?), Health MAY not be present
@@ -1083,6 +1085,11 @@ class Monitor extends BeanModel {
                 log.warn(
                     "monitor",
                     `Monitor #${this.id} '${this.name}': Pending: ${bean.msg} | Max retries: ${this.maxretries} | Retry: ${retries} | Retry Interval: ${beatInterval} seconds | Type: ${this.type}`
+                );
+            } else if (bean.status === RESTARTING) {
+                log.warn(
+                    "monitor",
+                    `Monitor #${this.id} '${this.name}': Restarting: ${bean.msg} | Interval: ${beatInterval} seconds | Type: ${this.type}`
                 );
             } else if (bean.status === MAINTENANCE) {
                 log.warn("monitor", `Monitor #${this.id} '${this.name}': Under Maintenance | Type: ${this.type}`);
@@ -1441,8 +1448,12 @@ class Monitor extends BeanModel {
         // * MAINTENANCE -> DOWN = important
         // * DOWN -> MAINTENANCE = important
         // * UP -> MAINTENANCE = important
+        // * ANY -> RESTARTING = important
+        // * RESTARTING -> ANY = important
         return (
             isFirstBeat ||
+            (previousBeatStatus !== RESTARTING && currentBeatStatus === RESTARTING) ||
+            (previousBeatStatus === RESTARTING && currentBeatStatus !== RESTARTING) ||
             (previousBeatStatus === DOWN && currentBeatStatus === MAINTENANCE) ||
             (previousBeatStatus === UP && currentBeatStatus === MAINTENANCE) ||
             (previousBeatStatus === MAINTENANCE && currentBeatStatus === DOWN) ||
@@ -1476,8 +1487,13 @@ class Monitor extends BeanModel {
         // * MAINTENANCE -> DOWN = important
         // DOWN -> MAINTENANCE = not important
         // UP -> MAINTENANCE = not important
+        // * ANY -> RESTARTING = important
+        // * RESTARTING -> UP/DOWN = important
         return (
             isFirstBeat ||
+            (previousBeatStatus !== RESTARTING && currentBeatStatus === RESTARTING) ||
+            (previousBeatStatus === RESTARTING && currentBeatStatus === UP) ||
+            (previousBeatStatus === RESTARTING && currentBeatStatus === DOWN) ||
             (previousBeatStatus === MAINTENANCE && currentBeatStatus === DOWN) ||
             (previousBeatStatus === UP && currentBeatStatus === DOWN) ||
             (previousBeatStatus === DOWN && currentBeatStatus === UP) ||
@@ -1493,12 +1509,14 @@ class Monitor extends BeanModel {
      * @returns {Promise<void>}
      */
     static async sendNotification(isFirstBeat, monitor, bean) {
-        if (!isFirstBeat || bean.status === DOWN) {
+        if (!isFirstBeat || bean.status === DOWN || bean.status === RESTARTING) {
             const notificationList = await Monitor.getNotificationList(monitor);
 
             let text;
             if (bean.status === UP) {
                 text = "✅ Up";
+            } else if (bean.status === RESTARTING) {
+                text = "🔄 Restarting";
             } else {
                 text = "🔴 Down";
             }

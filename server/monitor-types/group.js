@@ -1,4 +1,4 @@
-const { UP, PENDING, DOWN } = require("../../src/util");
+const { UP, PENDING, DOWN, RESTARTING } = require("../../src/util");
 const { MonitorType } = require("./monitor-type");
 const Monitor = require("../model/monitor");
 
@@ -21,6 +21,7 @@ class GroupMonitorType extends MonitorType {
 
         let worstStatus = UP;
         const downChildren = [];
+        const restartingChildren = [];
         const pendingChildren = [];
 
         for (const child of children) {
@@ -43,8 +44,13 @@ class GroupMonitorType extends MonitorType {
             if (lastBeat.status === DOWN) {
                 worstStatus = DOWN;
                 downChildren.push(label);
-            } else if (lastBeat.status === PENDING) {
+            } else if (lastBeat.status === RESTARTING) {
                 if (worstStatus !== DOWN) {
+                    worstStatus = RESTARTING;
+                }
+                restartingChildren.push(label);
+            } else if (lastBeat.status === PENDING) {
+                if (worstStatus !== DOWN && worstStatus !== RESTARTING) {
                     worstStatus = PENDING;
                 }
                 pendingChildren.push(label);
@@ -60,6 +66,15 @@ class GroupMonitorType extends MonitorType {
         if (worstStatus === PENDING) {
             heartbeat.status = PENDING;
             heartbeat.msg = `Pending child monitors: ${pendingChildren.join(", ")}`;
+            return;
+        }
+
+        if (worstStatus === RESTARTING) {
+            heartbeat.status = RESTARTING;
+            heartbeat.msg = `Restarting child monitors: ${restartingChildren.join(", ")}`;
+            if (pendingChildren.length > 0) {
+                heartbeat.msg += `; pending: ${pendingChildren.join(", ")}`;
+            }
             return;
         }
 
