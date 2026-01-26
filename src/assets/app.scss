@@ -39,6 +39,11 @@ textarea.form-control {
     background-color: $maintenance !important;
 }
 
+.bg-restarting {
+    color: white !important;
+    background-color: $restarting !important;
+}
+
 .bg-dark {
     color: white;
 }
@@ -47,8 +52,16 @@ textarea.form-control {
     color: $maintenance !important;
 }
 
+.text-restarting {
+    color: $restarting !important;
+}
+
 .incident a,
 .bg-maintenance a {
+    color: inherit;
+}
+
+.bg-restarting a {
     color: inherit;
 }
 
@@ -301,6 +314,10 @@ optgroup {
 
     .incident a,
     .bg-maintenance a {
+        color: inherit;
+    }
+
+    .bg-restarting a {
         color: inherit;
     }
 

@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { DOWN, MAINTENANCE, PENDING, UP } from "../util.ts";
+import { DOWN, MAINTENANCE, PENDING, UP, RESTARTING } from "../util.ts";
 
 export default {
     props: {
@@ -46,20 +46,28 @@ export default {
         },
 
         color() {
-            if (this.lastHeartBeat.status === MAINTENANCE) {
+            const status = Number(this.lastHeartBeat.status);
+            if (!Number.isFinite(status)) {
+                return "secondary";
+            }
+            if (status === MAINTENANCE) {
                 return "maintenance";
             }
 
-            if (this.lastHeartBeat.status === DOWN) {
+            if (status === DOWN) {
                 return "danger";
             }
 
-            if (this.lastHeartBeat.status === UP) {
+            if (status === UP) {
                 return "primary";
             }
 
-            if (this.lastHeartBeat.status === PENDING) {
+            if (status === PENDING) {
                 return "warning";
+            }
+
+            if (status === RESTARTING) {
+                return "restarting";
             }
 
             return "secondary";

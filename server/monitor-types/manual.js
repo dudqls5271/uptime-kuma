@@ -1,5 +1,5 @@
 const { MonitorType } = require("./monitor-type");
-const { UP, DOWN, PENDING } = require("../../src/util");
+const { UP, DOWN, PENDING, RESTARTING } = require("../../src/util");
 
 class ManualMonitorType extends MonitorType {
     name = "Manual";
@@ -22,6 +22,9 @@ class ManualMonitorType extends MonitorType {
                     break;
                 case DOWN:
                     heartbeat.msg = "Down";
+                    break;
+                case RESTARTING:
+                    heartbeat.msg = "Restarting";
                     break;
                 default:
                     heartbeat.msg = "Pending";

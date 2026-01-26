@@ -40,7 +40,7 @@
 
 <script>
 import dayjs from "dayjs";
-import { DOWN, UP, PENDING, MAINTENANCE } from "../util.ts";
+import { DOWN, UP, PENDING, MAINTENANCE, RESTARTING } from "../util.ts";
 import Tooltip from "./Tooltip.vue";
 
 export default {
@@ -427,6 +427,7 @@ export default {
                 down: status === DOWN,
                 pending: status === PENDING,
                 maintenance: status === MAINTENANCE,
+                restarting: status === RESTARTING,
             };
         },
 
@@ -436,7 +437,11 @@ export default {
          * @returns {string} Aria label
          */
         getBeatAriaLabel(beat) {
-            switch (beat?.status) {
+            const status = Number(beat?.status);
+            if (!Number.isFinite(status)) {
+                return "No data";
+            }
+            switch (status) {
                 case DOWN:
                     return `Down at ${this.$root.datetime(beat.time)}`;
                 case UP:
@@ -445,6 +450,8 @@ export default {
                     return `Pending at ${this.$root.datetime(beat.time)}`;
                 case MAINTENANCE:
                     return `Maintenance at ${this.$root.datetime(beat.time)}`;
+                case RESTARTING:
+                    return `Restarting at ${this.$root.datetime(beat.time)}`;
                 default:
                     return "No data";
             }
@@ -564,6 +571,7 @@ export default {
                 down: rootStyles.getPropertyValue("--bs-danger") || "#dc3545",
                 pending: rootStyles.getPropertyValue("--bs-warning") || "#ffc107",
                 maintenance: rootStyles.getPropertyValue("--maintenance") || "#1d4ed8",
+                restarting: rootStyles.getPropertyValue("--restarting") || "#14b8a6",
                 up: rootStyles.getPropertyValue("--bs-primary") || "#5cdd8b",
             };
 
@@ -643,6 +651,9 @@ export default {
             }
 
             const status = Number(beat.status);
+            if (!Number.isFinite(status)) {
+                return colors.empty;
+            }
 
             if (status === DOWN) {
                 return colors.down;
@@ -650,6 +661,8 @@ export default {
                 return colors.pending;
             } else if (status === MAINTENANCE) {
                 return colors.maintenance;
+            } else if (status === RESTARTING) {
+                return colors.restarting;
             } else {
                 return colors.up;
             }

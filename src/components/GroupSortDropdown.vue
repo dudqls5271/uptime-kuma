@@ -301,17 +301,20 @@ export default {
                                 if (lastStatus === 0) {
                                     return 0;
                                 } // Down
-                                if (lastStatus === 1) {
+                                if (lastStatus === 4) {
                                     return 1;
+                                } // Restarting
+                                if (lastStatus === 1) {
+                                    return 2;
                                 } // Up
                                 if (lastStatus === 2) {
-                                    return 2;
+                                    return 3;
                                 } // Pending
                                 if (lastStatus === 3) {
-                                    return 3;
+                                    return 4;
                                 } // Maintenance
                             }
-                            return 4; // Unknown/No data
+                            return 5; // Unknown/No data
                         };
                         valueA = getStatusPriority(a);
                         valueB = getStatusPriority(b);

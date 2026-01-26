@@ -3,6 +3,8 @@
 </template>
 
 <script>
+import { DOWN, UP, PENDING, MAINTENANCE, RESTARTING } from "../util.ts";
+
 export default {
     props: {
         /** Current status of monitor */
@@ -14,40 +16,56 @@ export default {
 
     computed: {
         color() {
-            if (this.status === 0) {
+            const status = Number(this.status);
+            if (!Number.isFinite(status)) {
+                return "secondary";
+            }
+            if (status === DOWN) {
                 return "danger";
             }
 
-            if (this.status === 1) {
+            if (status === UP) {
                 return "primary";
             }
 
-            if (this.status === 2) {
+            if (status === PENDING) {
                 return "warning";
             }
 
-            if (this.status === 3) {
+            if (status === MAINTENANCE) {
                 return "maintenance";
+            }
+
+            if (status === RESTARTING) {
+                return "restarting";
             }
 
             return "secondary";
         },
 
         text() {
-            if (this.status === 0) {
+            const status = Number(this.status);
+            if (!Number.isFinite(status)) {
+                return this.$t("Unknown");
+            }
+            if (status === DOWN) {
                 return this.$t("Down");
             }
 
-            if (this.status === 1) {
+            if (status === UP) {
                 return this.$t("Up");
             }
 
-            if (this.status === 2) {
+            if (status === PENDING) {
                 return this.$t("Pending");
             }
 
-            if (this.status === 3) {
+            if (status === MAINTENANCE) {
                 return this.$t("statusMaintenance");
+            }
+
+            if (status === RESTARTING) {
+                return this.$t("Restarting");
             }
 
             return this.$t("Unknown");

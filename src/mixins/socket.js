@@ -5,7 +5,7 @@ import Favico from "favico.js";
 import dayjs from "dayjs";
 import mitt from "mitt";
 
-import { DOWN, MAINTENANCE, PENDING, UP } from "../util.ts";
+import { DOWN, MAINTENANCE, PENDING, UP, RESTARTING } from "../util.ts";
 import {
     getDevContainerServerHostname,
     isDevContainer,
@@ -202,6 +202,13 @@ export default {
             });
 
             socket.on("heartbeat", (data) => {
+                console.log("[heartbeat]", {
+                    monitorID: data?.monitorID,
+                    status: data?.status,
+                    statusType: typeof data?.status,
+                    msg: data?.msg,
+                });
+
                 if (!(data.monitorID in this.heartbeatList)) {
                     this.heartbeatList[data.monitorID] = [];
                 }
@@ -765,22 +772,27 @@ export default {
 
                 if (!lastHeartBeat) {
                     result[monitorID] = unknown;
-                } else if (lastHeartBeat.status === UP) {
+                } else if (Number(lastHeartBeat.status) === UP) {
                     result[monitorID] = {
                         text: this.$t("Up"),
                         color: "primary",
                     };
-                } else if (lastHeartBeat.status === DOWN) {
+                } else if (Number(lastHeartBeat.status) === DOWN) {
                     result[monitorID] = {
                         text: this.$t("Down"),
                         color: "danger",
                     };
-                } else if (lastHeartBeat.status === PENDING) {
+                } else if (Number(lastHeartBeat.status) === PENDING) {
                     result[monitorID] = {
                         text: this.$t("Pending"),
                         color: "warning",
                     };
-                } else if (lastHeartBeat.status === MAINTENANCE) {
+                } else if (Number(lastHeartBeat.status) === RESTARTING) {
+                    result[monitorID] = {
+                        text: this.$t("Restarting"),
+                        color: "restarting",
+                    };
+                } else if (Number(lastHeartBeat.status) === MAINTENANCE) {
                     result[monitorID] = {
                         text: this.$t("statusMaintenance"),
                         color: "maintenance",
@@ -800,6 +812,7 @@ export default {
                 down: 0,
                 maintenance: 0,
                 pending: 0,
+                restarting: 0,
                 unknown: 0,
                 pause: 0,
             };
@@ -812,13 +825,16 @@ export default {
                     result.pause++;
                 } else if (beat) {
                     result.active++;
-                    if (beat.status === UP) {
+                    const status = Number(beat.status);
+                    if (status === UP) {
                         result.up++;
-                    } else if (beat.status === DOWN) {
+                    } else if (status === DOWN) {
                         result.down++;
-                    } else if (beat.status === PENDING) {
+                    } else if (status === PENDING) {
                         result.pending++;
-                    } else if (beat.status === MAINTENANCE) {
+                    } else if (status === RESTARTING) {
+                        result.restarting++;
+                    } else if (status === MAINTENANCE) {
                         result.maintenance++;
                     } else {
                         result.unknown++;

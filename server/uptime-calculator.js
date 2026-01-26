@@ -1,5 +1,5 @@
 const dayjs = require("dayjs");
-const { UP, MAINTENANCE, DOWN, PENDING } = require("../src/util");
+const { UP, MAINTENANCE, DOWN, PENDING, RESTARTING } = require("../src/util");
 const { LimitQueue } = require("./utils/limit-queue");
 const { log } = require("../src/util");
 const { R } = require("redbean-node");
@@ -546,6 +546,7 @@ class UptimeCalculator {
                 return UP;
             case DOWN:
             case PENDING:
+            case RESTARTING:
                 return DOWN;
         }
         throw new Error("Invalid status");
