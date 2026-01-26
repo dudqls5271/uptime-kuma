@@ -842,6 +842,7 @@ class Monitor extends BeanModel {
                     };
 
                     const dockerHost = await R.load("docker_host", this.docker_host);
+                    let state = null;
 
                     if (!dockerHost) {
                         throw new Error("Failed to load docker host config");
@@ -854,37 +855,82 @@ class Monitor extends BeanModel {
                         options.httpsAgent = new https.Agent(
                             await DockerHost.getHttpsAgentOptions(dockerHost._dockerType, options.baseURL)
                         );
+                    } else if (dockerHost._dockerType === "ssh") {
+                        const stdout = await DockerHost.execDockerViaSSH(
+                            dockerHost._dockerDaemon,
+                            ["inspect", "--format={{json .State}}", this.docker_container],
+                            this.interval * 1000 * 0.8
+                        );
+                        const line = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
+                        if (!line) {
+                            throw new Error("Container state is not available");
+                        }
+                        try {
+                            state = JSON.parse(line);
+                        } catch (e) {
+                            throw new Error("Container state is not available");
+                        }
                     }
 
-                    log.debug("monitor", `[${this.name}] Axios Request`);
-                    let res = await axios.request(options);
+                    if (!state) {
+                        log.debug("monitor", `[${this.name}] Axios Request`);
+                        let res = await axios.request(options);
+                        state = res.data.State;
+                    }
 
-                    if (!res.data.State) {
+                    if (!state) {
                         throw Error("Container state is not available");
                     }
-                    if (!res.data.State.Running) {
-                        throw Error("Container State is " + res.data.State.Status);
+                    if (!state.Running) {
+                        throw Error("Container State is " + state.Status);
                     }
-                    if (res.data.State.Paused) {
+                    if (state.Paused) {
                         throw Error("Container is in a paused state");
                     }
-                    if (res.data.State.Restarting) {
+                    if (state.Restarting) {
                         bean.status = RESTARTING;
                         bean.msg = "Container is reporting it is currently restarting";
-                    } else if (res.data.State.Health && res.data.State.Health.Status !== "none") {
+                    } else if (state.Health && state.Health.Status !== "none") {
                         // if healthchecks are disabled (?), Health MAY not be present
-                        if (res.data.State.Health.Status === "healthy") {
+                        if (state.Health.Status === "healthy") {
                             bean.status = UP;
                             bean.msg = "healthy";
-                        } else if (res.data.State.Health.Status === "unhealthy") {
+                        } else if (state.Health.Status === "unhealthy") {
                             throw Error("Container State is unhealthy according to its healthcheck");
                         } else {
                             bean.status = PENDING;
-                            bean.msg = res.data.State.Health.Status;
+                            bean.msg = state.Health.Status;
                         }
                     } else {
                         bean.status = UP;
-                        bean.msg = `Container has not reported health and is currently ${res.data.State.Status}. As it is running, it is considered UP. Consider adding a health check for better service visibility`;
+                        bean.msg = `Container has not reported health and is currently ${state.Status}. As it is running, it is considered UP. Consider adding a health check for better service visibility`;
+                    }
+
+                    if (dockerHost._dockerType === "ssh") {
+                        try {
+                            const containerIP = await DockerHost.getContainerIPAddressViaSSH(
+                                dockerHost._dockerDaemon,
+                                this.docker_container,
+                                this.interval * 1000 * 0.8
+                            );
+                            const pingStart = dayjs().valueOf();
+                            await DockerHost.execCommandViaSSH(
+                                dockerHost._dockerDaemon,
+                                [
+                                    "ping",
+                                    "-n",
+                                    "-c",
+                                    String(PING_COUNT_DEFAULT),
+                                    "-W",
+                                    String(PING_PER_REQUEST_TIMEOUT_DEFAULT),
+                                    containerIP,
+                                ],
+                                this.interval * 1000 * 0.8
+                            );
+                            bean.ping = dayjs().valueOf() - pingStart;
+                        } catch (e) {
+                            log.debug("monitor", `[${this.name}] SSH ping skipped: ${e.message}`);
+                        }
                     }
                 } else if (this.type === "radius") {
                     let startTime = dayjs().valueOf();

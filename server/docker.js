@@ -3,6 +3,7 @@ const { R } = require("redbean-node");
 const https = require("https");
 const fsAsync = require("fs").promises;
 const path = require("path");
+const { execFile } = require("child_process");
 const Database = require("./database");
 const { axiosAbortSignal, fsExists } = require("./util-server");
 
@@ -10,6 +11,144 @@ class DockerHost {
     static CertificateFileNameCA = "ca.pem";
     static CertificateFileNameCert = "cert.pem";
     static CertificateFileNameKey = "key.pem";
+    static DockerOutputMaxChars = 200;
+
+    static escapeSshArg(arg) {
+        if (arg === "") {
+            return "''";
+        }
+        return `'${String(arg).replace(/'/g, `'\"'\"'`)}'`;
+    }
+
+    static buildSshArgs(parsed, remoteArgs) {
+        const sshArgs = [
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=5",
+        ];
+
+        if (parsed.port) {
+            sshArgs.push("-p", parsed.port);
+        }
+
+        sshArgs.push(parsed.userHost, remoteArgs.map(DockerHost.escapeSshArg).join(" "));
+        return sshArgs;
+    }
+
+    static trimOutput(output) {
+        let text = (output || "").toString().trim();
+        if (text.length > DockerHost.DockerOutputMaxChars) {
+            text = text.substring(0, DockerHost.DockerOutputMaxChars) + "...";
+        }
+        return text;
+    }
+
+    static parseSshDaemon(dockerDaemon) {
+        if (typeof dockerDaemon !== "string") {
+            throw new Error("Invalid SSH Docker daemon URL");
+        }
+
+        let url;
+        try {
+            url = new URL(dockerDaemon);
+        } catch (e) {
+            throw new Error("Invalid SSH Docker daemon URL");
+        }
+
+        if (url.protocol !== "ssh:") {
+            throw new Error("SSH Docker daemon URL must start with ssh://");
+        }
+
+        if (!url.hostname) {
+            throw new Error("SSH Docker daemon URL requires a hostname");
+        }
+
+        let userHost = url.hostname;
+        if (url.username) {
+            userHost = `${decodeURIComponent(url.username)}@${url.hostname}`;
+        }
+
+        const socketPath = url.pathname && url.pathname !== "/" ? url.pathname : null;
+
+        return {
+            userHost,
+            port: url.port || null,
+            socketPath,
+        };
+    }
+
+    static async execCommandViaSSH(dockerDaemon, commandArgs, timeoutMs = 5000) {
+        const parsed = DockerHost.parseSshDaemon(dockerDaemon);
+        const sshArgs = DockerHost.buildSshArgs(parsed, commandArgs);
+
+        return await new Promise((resolve, reject) => {
+            execFile("ssh", sshArgs, { timeout: timeoutMs }, (error, stdout, stderr) => {
+                if (error) {
+                    const output = DockerHost.trimOutput(stderr || stdout || error.message);
+                    reject(new Error(output || "Failed to execute command over SSH"));
+                    return;
+                }
+
+                resolve((stdout || "").toString());
+            });
+        });
+    }
+
+    static async execDockerViaSSH(dockerDaemon, dockerArgs, timeoutMs = 5000) {
+        const parsed = DockerHost.parseSshDaemon(dockerDaemon);
+
+        const remoteArgs = [];
+        if (parsed.socketPath) {
+            remoteArgs.push("env", `DOCKER_HOST=unix://${parsed.socketPath}`);
+        }
+        remoteArgs.push("docker", ...dockerArgs);
+
+        const sshArgs = DockerHost.buildSshArgs(parsed, remoteArgs);
+
+        return await new Promise((resolve, reject) => {
+            execFile("ssh", sshArgs, { timeout: timeoutMs }, (error, stdout, stderr) => {
+                if (error) {
+                    const output = DockerHost.trimOutput(stderr || stdout || error.message);
+                    reject(new Error(output || "Failed to execute docker command over SSH"));
+                    return;
+                }
+
+                resolve((stdout || "").toString());
+            });
+        });
+    }
+
+    static async getContainerIPAddressViaSSH(dockerDaemon, containerName, timeoutMs = 5000) {
+        const stdout = await DockerHost.execDockerViaSSH(
+            dockerDaemon,
+            ["inspect", "--format={{json .NetworkSettings.Networks}}", containerName],
+            timeoutMs
+        );
+        const line = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
+        if (!line) {
+            throw new Error("Container IP is not available");
+        }
+
+        let networks;
+        try {
+            networks = JSON.parse(line);
+        } catch (e) {
+            throw new Error("Container IP is not available");
+        }
+
+        if (!networks || typeof networks !== "object") {
+            throw new Error("Container IP is not available");
+        }
+
+        const entries = Object.values(networks);
+        const first = entries.find((entry) => entry && entry.IPAddress);
+        if (!first || !first.IPAddress) {
+            throw new Error("Container IP is not available");
+        }
+
+        return first.IPAddress;
+    }
 
     /**
      * Save a docker host
@@ -82,6 +221,10 @@ class DockerHost {
             options.httpsAgent = new https.Agent(
                 await DockerHost.getHttpsAgentOptions(dockerHost.dockerType, options.baseURL)
             );
+        } else if (dockerHost.dockerType === "ssh") {
+            const stdout = await DockerHost.execDockerViaSSH(dockerHost.dockerDaemon, ["ps", "-a", "-q"], 6000);
+            const lines = stdout.split(/\r?\n/).filter((line) => line.trim().length > 0);
+            return lines.length;
         }
 
         try {
