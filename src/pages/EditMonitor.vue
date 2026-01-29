@@ -966,16 +966,48 @@
                                         required
                                         placeholder="nginx"
                                     />
+                                </div>
 
-                                    <div class="form-text">
-                                        <template v-if="$root.info.runtime.platform === 'linux'">
-                                            {{
-                                                $t("systemServiceDescriptionLinux", {
-                                                    service_name: monitor.system_service_name || "nginx",
-                                                })
-                                            }}
-                                        </template>
-                                        <template v-else-if="$root.info.runtime.platform === 'win32'">
+                                <div class="my-3">
+                                    <label for="system-service-check-method" class="form-label">
+                                        {{ $t("systemServiceCheckMethod") }}
+                                    </label>
+                                    <select id="system-service-check-method" v-model="monitor.system_service_check_method" class="form-select">
+                                        <option value="local">{{ $t("systemServiceCheckMethodLocal") }}</option>
+                                        <option value="ssh">{{ $t("systemServiceCheckMethodSSH") }}</option>
+                                    </select>
+                                </div>
+
+                                <div v-if="monitor.system_service_check_method === 'ssh'" class="my-3">
+                                    <label for="system-service-ssh-url" class="form-label">{{ $t("systemServiceSshTarget") }}</label>
+                                    <input
+                                        id="system-service-ssh-url"
+                                        v-model="monitor.system_service_ssh_url"
+                                        type="text"
+                                        class="form-control"
+                                        required
+                                        placeholder="ssh://user@host:22"
+                                    />
+                                    <div class="form-text">{{ $t("systemServiceSshTargetHint") }}</div>
+                                </div>
+
+                                <div v-if="monitor.system_service_check_method === 'ssh'" class="my-3">
+                                    <label for="system-service-ssh-platform" class="form-label">
+                                        {{ $t("systemServiceSshPlatform") }}
+                                    </label>
+                                    <select
+                                        id="system-service-ssh-platform"
+                                        v-model="monitor.system_service_ssh_platform"
+                                        class="form-select"
+                                    >
+                                        <option value="linux">{{ $t("systemServiceSshPlatformLinux") }}</option>
+                                        <option value="win32">{{ $t("systemServiceSshPlatformWindows") }}</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-text">
+                                    <template v-if="monitor.system_service_check_method === 'ssh'">
+                                        <template v-if="monitor.system_service_ssh_platform === 'win32'">
                                             {{
                                                 $t("systemServiceDescriptionWindows", {
                                                     service_name: monitor.system_service_name || "Dnscache",
@@ -984,53 +1016,88 @@
                                         </template>
                                         <template v-else>
                                             {{
-                                                $t("systemServiceDescription", {
+                                                $t("systemServiceDescriptionLinux", {
                                                     service_name: monitor.system_service_name || "nginx",
                                                 })
                                             }}
                                         </template>
+                                    </template>
+                                    <template v-else-if="$root.info.runtime.platform === 'linux'">
+                                        {{
+                                            $t("systemServiceDescriptionLinux", {
+                                                service_name: monitor.system_service_name || "nginx",
+                                            })
+                                        }}
+                                    </template>
+                                    <template v-else-if="$root.info.runtime.platform === 'win32'">
+                                        {{
+                                            $t("systemServiceDescriptionWindows", {
+                                                service_name: monitor.system_service_name || "Dnscache",
+                                            })
+                                        }}
+                                    </template>
+                                    <template v-else>
+                                        {{
+                                            $t("systemServiceDescription", {
+                                                service_name: monitor.system_service_name || "nginx",
+                                            })
+                                        }}
+                                    </template>
 
-                                        <template
+                                    <template
+                                        v-if="
+                                            !monitor.system_service_name ||
+                                            /^[a-zA-Z0-9_\-\.\@\ ]+$/.test(monitor.system_service_name)
+                                        "
+                                    >
+                                        <div
                                             v-if="
-                                                !monitor.system_service_name ||
-                                                /^[a-zA-Z0-9_\-\.\@\ ]+$/.test(monitor.system_service_name)
+                                                (monitor.system_service_check_method === 'ssh' &&
+                                                    monitor.system_service_ssh_platform === 'linux') ||
+                                                (monitor.system_service_check_method !== 'ssh' &&
+                                                    $root.info.runtime.platform === 'linux')
                                             "
+                                            class="mt-2"
                                         >
-                                            <div v-if="$root.info.runtime.platform === 'linux'" class="mt-2">
-                                                <div>
-                                                    <i18n-t keypath="systemServiceCommandHint" tag="span">
-                                                        <template #command>
-                                                            <code>
-                                                                systemctl is-active
-                                                                {{ monitor.system_service_name || "nginx" }}
-                                                            </code>
-                                                        </template>
-                                                    </i18n-t>
-                                                </div>
-                                                <div class="text-secondary small">
-                                                    {{ $t("systemServiceExpectedOutput", ["active"]) }}
-                                                </div>
+                                            <div>
+                                                <i18n-t keypath="systemServiceCommandHint" tag="span">
+                                                    <template #command>
+                                                        <code>
+                                                            systemctl is-active
+                                                            {{ monitor.system_service_name || "nginx" }}
+                                                        </code>
+                                                    </template>
+                                                </i18n-t>
                                             </div>
-                                            <div v-else-if="$root.info.runtime.platform === 'win32'" class="mt-2">
-                                                <div>
-                                                    <i18n-t keypath="systemServiceCommandHint" tag="span">
-                                                        <template #command>
-                                                            <code>
-                                                                (Get-Service -Name '{{
-                                                                    (
-                                                                        monitor.system_service_name || "Dnscache"
-                                                                    ).replaceAll("'", "''")
-                                                                }}').Status
-                                                            </code>
-                                                        </template>
-                                                    </i18n-t>
-                                                </div>
-                                                <div class="text-secondary small">
-                                                    {{ $t("systemServiceExpectedOutput", ["Running"]) }}
-                                                </div>
+                                            <div class="text-secondary small">
+                                                {{ $t("systemServiceExpectedOutput", ["active"]) }}
                                             </div>
-                                        </template>
-                                    </div>
+                                        </div>
+                                        <div
+                                            v-else-if="
+                                                (monitor.system_service_check_method === 'ssh' &&
+                                                    monitor.system_service_ssh_platform === 'win32') ||
+                                                (monitor.system_service_check_method !== 'ssh' &&
+                                                    $root.info.runtime.platform === 'win32')
+                                            "
+                                            class="mt-2"
+                                        >
+                                            <div>
+                                                <i18n-t keypath="systemServiceCommandHint" tag="span">
+                                                    <template #command>
+                                                        <code>
+                                                            (Get-Service -Name '{{
+                                                                (monitor.system_service_name || "Dnscache").replaceAll("'", "''")
+                                                            }}').Status
+                                                        </code>
+                                                    </template>
+                                                </i18n-t>
+                                            </div>
+                                            <div class="text-secondary small">
+                                                {{ $t("systemServiceExpectedOutput", ["Running"]) }}
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
 
@@ -2344,6 +2411,9 @@ const monitorDefaults = {
     rabbitmqPassword: "",
     conditions: [],
     system_service_name: "",
+    system_service_check_method: "local",
+    system_service_ssh_url: "",
+    system_service_ssh_platform: "linux",
 };
 
 export default {
@@ -2958,6 +3028,18 @@ message HealthCheckResponse {
                                 this.monitor.timeout = ~~(this.monitor.interval * 8) / 10;
                             }
                         }
+
+                        if (this.monitor.type === "system-service") {
+                            if (!this.monitor.system_service_check_method) {
+                                this.monitor.system_service_check_method = "local";
+                            }
+                            if (!this.monitor.system_service_ssh_platform) {
+                                this.monitor.system_service_ssh_platform = "linux";
+                            }
+                            if (!this.monitor.system_service_ssh_url) {
+                                this.monitor.system_service_ssh_url = "";
+                            }
+                        }
                     } else {
                         this.$root.toastError(res.msg);
                     }
@@ -2999,6 +3081,17 @@ message HealthCheckResponse {
             if (this.monitor.type === "docker") {
                 if (this.monitor.docker_host == null) {
                     toast.error(this.$t("DockerHostRequired"));
+                    return false;
+                }
+            }
+
+            if (this.monitor.type === "system-service" && this.monitor.system_service_check_method === "ssh") {
+                if (!this.monitor.system_service_ssh_url) {
+                    toast.error(this.$t("systemServiceSshTargetRequired"));
+                    return false;
+                }
+                if (!this.monitor.system_service_ssh_url.startsWith("ssh://")) {
+                    toast.error(this.$t("systemServiceSshTargetInvalid"));
                     return false;
                 }
             }

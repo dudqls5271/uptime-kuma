@@ -920,6 +920,9 @@ let needSetup = false;
                 bean.conditions = JSON.stringify(monitor.conditions);
                 bean.manual_status = monitor.manual_status;
                 bean.system_service_name = monitor.system_service_name;
+                bean.system_service_check_method = monitor.system_service_check_method;
+                bean.system_service_ssh_url = monitor.system_service_ssh_url;
+                bean.system_service_ssh_platform = monitor.system_service_ssh_platform;
                 bean.expected_tls_alert = monitor.expectedTlsAlert;
 
                 // ping advanced options
