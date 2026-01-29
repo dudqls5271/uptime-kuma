@@ -48,7 +48,7 @@ class PostgresMonitorType extends MonitorType {
                 const result = await this.postgresQuery(monitor.databaseConnectionString, query);
                 heartbeat.ping = dayjs().valueOf() - startTime;
                 heartbeat.status = UP;
-                heartbeat.msg = result;
+                heartbeat.msg = `rows: ${result.rowCount ?? 0}`;
             }
         } catch (error) {
             heartbeat.ping = dayjs().valueOf() - startTime;
